@@ -1,0 +1,101 @@
+name: Deploy (prod)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  SERVER_IP: 46.243.6.200
+  DEPLOY_DIR: /opt/task-management-app
+
+jobs:
+  deploy:
+    name: Деплой на прод
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Настройка SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+          log-public-key: false
+
+      - name: Добавление сервера в known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H $SERVER_IP >> ~/.ssh/known_hosts
+
+      - name: Подготовка .env для продакшена
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          API_KEY_HEADER: ${{ vars.API_KEY_HEADER || 'X-API-KEY' }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          if [ -z "$POSTGRES_PASSWORD" ]; then
+            echo "ERROR: GitHub secret POSTGRES_PASSWORD пуст"
+            exit 1
+          fi
+          if [ -z "$API_KEY" ]; then
+            echo "ERROR: GitHub secret API_KEY пуст"
+            exit 1
+          fi
+          cat > .env.production << EOF
+          # Приложение
+          TEMPLATE_APP_NAME=Task Management Service
+          TEMPLATE_APP_VERSION=0.1.0
+          TEMPLATE_APP_HOST=0.0.0.0
+          TEMPLATE_APP_PORT=8000
+          TEMPLATE_APP_DEBUG=false
+          TEMPLATE_APP_API_KEY_HEADER=${API_KEY_HEADER}
+          TEMPLATE_APP_API_KEY=${API_KEY}
+
+          # CORS
+          CORS_ALLOW_ORIGINS=["http://${SERVER_IP}:3000","http://localhost:3000"]
+          CORS_ALLOW_CREDENTIALS=true
+          CORS_ALLOW_METHODS=["*"]
+          CORS_ALLOW_HEADERS=["*"]
+
+          # PostgreSQL
+          POSTGRES_PORT=5432
+          POSTGRES_USER=task_user
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          POSTGRES_DB=task_db
+
+          # БД (внутри docker-сети)
+          DATABASE_DSN=postgresql+asyncpg://task_user:${POSTGRES_PASSWORD}@postgres:5432/task_db
+          DATABASE_ECHO=false
+          DATABASE_POOL_SIZE=5
+          DATABASE_MAX_OVERFLOW=10
+          DATABASE_POOL_TIMEOUT=60
+          DATABASE_POOL_RECYCLE=3600
+
+          # Фронтенд (URL API с точки зрения браузера)
+          NEXT_PUBLIC_API_URL=http://${SERVER_IP}:8000/api/v1
+          NEXT_PUBLIC_API_KEY_HEADER=${API_KEY_HEADER}
+          NEXT_PUBLIC_API_KEY=${API_KEY}
+
+          # Sentry (опционально)
+          SENTRY_DSN=
+          SENTRY_ENVIRONMENT=production
+          SENTRY_TRACES_SAMPLE_RATE=0.1
+          SENTRY_PROFILES_SAMPLE_RATE=0.0
+          EOF
+
+      - name: Деплой на сервер
+        run: |
+          ssh root@$SERVER_IP "mkdir -p $DEPLOY_DIR"
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'node_modules' \
+            --exclude 'frontend/node_modules' \
+            --exclude 'frontend/.next' \
+            --exclude 'backend/.venv' \
+            --exclude 'backend/__pycache__' \
+            --exclude '.env' \
+            ./ root@$SERVER_IP:$DEPLOY_DIR/
+          scp .env.production root@$SERVER_IP:$DEPLOY_DIR/.env
+          ssh root@$SERVER_IP "cd $DEPLOY_DIR && docker compose pull || true && docker compose up -d --build && docker image prune -f"

@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  backend:
+    name: Бэкенд (линт и тесты)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Установка uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Установка Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Установка зависимостей
+        run: uv sync --frozen
+
+      - name: Линт (flake8)
+        run: uv run flake8
+
+      - name: Проверка форматирования (black)
+        run: uv run black --check .
+
+      - name: Проверка импортов (isort)
+        run: uv run isort --check-only .
+
+      - name: Тесты
+        run: uv run pytest tests/ --no-cov
+
+  frontend:
+    name: Фронтенд (линт и сборка)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Установка Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Установка зависимостей
+        run: npm install
+
+      - name: Линт
+        run: node ./node_modules/eslint/bin/eslint.js .
+        continue-on-error: true
+
+      - name: Сборка
+        run: node ./node_modules/next/dist/bin/next build --webpack
