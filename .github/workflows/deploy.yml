@@ -98,4 +98,4 @@ jobs:
             --exclude '.env' \
             ./ root@$SERVER_IP:$DEPLOY_DIR/
           scp .env.production root@$SERVER_IP:$DEPLOY_DIR/.env
-          ssh root@$SERVER_IP "cd $DEPLOY_DIR && docker compose pull || true && docker compose up -d --build && docker image prune -f"
+          ssh root@$SERVER_IP "cd $DEPLOY_DIR && docker compose up -d --build && docker builder prune -af && docker image prune -af"
