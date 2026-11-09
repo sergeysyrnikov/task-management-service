@@ -19,8 +19,13 @@ jobs:
       - name: Установка uv
         uses: astral-sh/setup-uv@v4
         with:
-          version: "latest"
+          version: "0.6.13"
           enable-cache: true
+
+      - name: Установка uv (fallback через pip)
+        if: failure()
+        run: |
+          pip install uv
 
       - name: Установка Python
         uses: actions/setup-python@v5
