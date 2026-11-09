@@ -25,7 +25,7 @@ FastAPI backend for the `task-management-service` project (To-Do / Task Manageme
 - `GET /` — service info (protected by API key when configured).
 - `GET /health` — health check (no API key).
 - `/metrics`, `/docs`, `/openapi.json` — no API key.
-- `GET /tasks` — list tasks (ordered by `created_at,id`).
+- `GET /tasks` — list tasks (ordered by `created_at,id` desc — newest first).
 - `POST /tasks` — create `{ "title": "..." }` → 201.
 - `PATCH /tasks/{task_id}` — partial update `{ "title"?, "completed"? }`.
 - `DELETE /tasks/{task_id}` → 204.

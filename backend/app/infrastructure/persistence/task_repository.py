@@ -39,7 +39,9 @@ class TaskRepository(BaseRepository, ITaskRepository):
         return model.to_domain() if model else None
 
     async def list_all(self) -> list[Task]:
-        result = await self.session.execute(select(TaskModel).order_by(TaskModel.created_at.asc(), TaskModel.id.asc()))
+        result = await self.session.execute(
+            select(TaskModel).order_by(TaskModel.created_at.desc(), TaskModel.id.desc())
+        )
         return [row.to_domain() for row in result.scalars().all()]
 
     async def delete(self, _id: UUID) -> bool:

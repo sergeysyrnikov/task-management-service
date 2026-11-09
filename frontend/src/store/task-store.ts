@@ -31,7 +31,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (!trimmed) return;
     set({ error: null });
     const task = await api.createTask(trimmed);
-    set({ tasks: [...get().tasks, task] });
+    set({ tasks: [task, ...get().tasks] });
   },
   toggleTask: async (task: Task) => {
     set({ error: null });
